@@ -14,7 +14,7 @@ from requests.exceptions import RequestException
 MAX_CONTENT_LENGTH = web.app.config.get("MAX_CONTENT_LENGTH") or 10485760
 CHUNK_SIZE = web.app.config.get("CHUNK_SIZE") or 16384
 DOWNLOAD_TIMEOUT = web.app.config.get("DOWNLOAD_TIMEOUT") or 30
-SUBPROCESS_TIMEOUT = web.app.config.get("DOWNLOAD_TIMEOUT") or 300
+SUBPROCESS_TIMEOUT = web.app.config.get("SUBPROCESS_TIMEOUT") or 300
 
 if web.app.config.get("SSL_VERIFY") in ["False", "FALSE", "0", False, 0]:
     SSL_VERIFY = False
