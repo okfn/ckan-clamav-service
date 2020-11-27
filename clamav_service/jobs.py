@@ -29,7 +29,6 @@ STATUSES = {
     0: "SUCCESSFUL SCAN, FILE CLEAN",
     1: "SUCCESSFUL SCAN, FILE INFECTED",
     2: "SCAN FAILED",
-    3: "JOB FAILED",
 }
 
 
@@ -173,34 +172,17 @@ def scan(task_id, payload):
     logger = init_logger(task_id, payload)
     logger.info(f"Starting job {task_id}")
 
-    try:
-        validate_payload(payload)
+    validate_payload(payload)
 
-        data = payload["metadata"]
-        ckan_url = data["ckan_url"]
-        resource_id = data["resource_id"]
-        api_key = payload.get("api_key")
+    data = payload["metadata"]
+    ckan_url = data["ckan_url"]
+    resource_id = data["resource_id"]
+    api_key = payload.get("api_key")
 
-        scan_result = scan_resource(logger, ckan_url, api_key, resource_id)
+    scan_result = scan_resource(logger, ckan_url, api_key, resource_id)
 
-        ckan_action(
-            "scanstatus_create",
-            ckan_url,
-            api_key,
-            {
-                "status_code": scan_result.returncode,
-                "status_text": STATUSES[scan_result.returncode],
-                "description": scan_result.stdout.decode("utf-8"),
-            },
-        )
-    except util.JobError as e:
-        ckan_action(
-            "scanstatus_create",
-            ckan_url,
-            api_key,
-            {
-                "status_code": 3,
-                "status_text": STATUSES[3],
-                "description": e.message,
-            },
-        )
+    return {
+        "status_code": scan_result.returncode,
+        "status_text": STATUSES[scan_result.returncode],
+        "description": scan_result.stdout.decode("utf-8"),
+    }
