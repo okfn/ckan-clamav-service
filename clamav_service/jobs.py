@@ -5,10 +5,8 @@ import tempfile
 import time
 from urllib.parse import urlsplit
 
-import ckanserviceprovider.job as job
-import ckanserviceprovider.util as util
 import requests
-from ckanserviceprovider import web
+from ckanserviceprovider import job, util, web
 from requests.exceptions import RequestException
 
 MAX_CONTENT_LENGTH = web.app.config.get("MAX_CONTENT_LENGTH") or 10485760
