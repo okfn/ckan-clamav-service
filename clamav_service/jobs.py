@@ -181,8 +181,11 @@ def scan(task_id, payload):
 
     scan_result = scan_resource(logger, ckan_url, api_key, resource_id)
 
-    return {
+    response = {
         "status_code": scan_result.returncode,
         "status_text": STATUSES[scan_result.returncode],
         "description": scan_result.stdout.decode("utf-8"),
     }
+    if scan_result.returncode == 2:
+        raise util.JobError(json.dumps(response))
+    return response
