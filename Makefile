@@ -21,5 +21,4 @@ lint:
 	flake8 .
 
 test:
-	make lint
 	pytest --cov clamav_service --cov-report=xml
