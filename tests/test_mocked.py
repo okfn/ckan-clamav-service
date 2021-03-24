@@ -116,7 +116,10 @@ def test_resource_is_not_upload():
 
     with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
-    assert str(excinfo.value) == "Only resources of type 'upload' can be scanned"
+    assert (
+        str(excinfo.value)
+        == "Only resources of type 'upload' can be scanned. Received 'datastore'"
+    )
 
 
 @responses.activate

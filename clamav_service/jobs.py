@@ -127,8 +127,11 @@ def scan_resource(logger, ckan_url, api_key, resource_id):
         time.sleep(5)
         resource = ckan_action("resource_show", ckan_url, api_key, {"id": resource_id})
 
-    if resource.get("url_type") != "upload":
-        raise util.JobError("Only resources of type 'upload' can be scanned")
+    url_type = resource.get("url_type")
+    if url_type != "upload":
+        raise util.JobError(
+            f"Only resources of type 'upload' can be scanned. Received '{str(url_type)}'"
+        )
 
     url = resource.get("url")
     scheme = urlsplit(url).scheme
