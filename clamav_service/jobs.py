@@ -113,12 +113,6 @@ def fetch_resource(url, tmpfile, api_key):
     tmpfile.seek(0)
 
 
-def update_clamav_definitions():
-    return subprocess.run(
-        ["freshclam"], stdout=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
-    )
-
-
 def scan_file(filename):
     return subprocess.run(
         ["clamscan", filename], stdout=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
@@ -140,15 +134,6 @@ def scan_resource(logger, ckan_url, api_key, resource_id):
     scheme = urlsplit(url).scheme
     if scheme not in ("http", "https", "ftp"):
         raise util.JobError("Only http, https, and ftp resources may be fetched.")
-
-    logger.info("Updating ClamAV Definitions")
-    try:
-        # TODO: move this to a yacron job instead of doing it inline
-        update_clamav_definitions()
-    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
-        # just steamroller errors here on the basis it is better
-        # to scan with old definitions than fail the job completely
-        logger.error("Failed to update definitions")
 
     logger.info(f"Fetching from {url}")
     with tempfile.NamedTemporaryFile() as tmp:

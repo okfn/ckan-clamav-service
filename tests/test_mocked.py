@@ -35,14 +35,12 @@ def test_completed_scan():
         body="a,b,c",
     )
 
-    jobs.update_clamav_definitions = mock.Mock()
     jobs.scan_file = mock.Mock(
         return_value=mock.MagicMock(returncode=0, stdout=b"/tmp/tmp37q_kv9u: OK...")
     )
 
     response = jobs.scan("fake-id", test_payload)
 
-    jobs.update_clamav_definitions.assert_called_once()
     jobs.scan_file.assert_called_once()
 
     assert {
