@@ -194,5 +194,5 @@ def test_clamav_error():
         jobs.scan("fake-id", test_payload)
     assert (
         str(excinfo.value)
-        == '{"status_code": 2, "status_text": "SCAN FAILED", "description": "oh no"}'
+        == '{"status_code": 2, "description": "oh no", "status_text": "SCAN FAILED"}'
     )
