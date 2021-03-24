@@ -52,14 +52,40 @@ def test_completed_scan():
 
 @responses.activate
 def test_invalid_payload():
-    with pytest.raises(util.JobError):
+    with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", {})
+    assert str(excinfo.value) == "Metadata missing"
 
-    with pytest.raises(util.JobError):
+    with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", {"metadata": {}})
+    assert str(excinfo.value) == "No id provided."
 
-    with pytest.raises(util.JobError):
-        jobs.scan("fake-id", {"metadata": {}, "ckan_url": "http://ckan.example.com"})
+    with pytest.raises(util.JobError) as excinfo:
+        jobs.scan("fake-id", {"metadata": {"ckan_url": "http://ckan.example.com"}})
+    assert str(excinfo.value) == "No id provided."
+
+    with pytest.raises(util.JobError) as excinfo:
+        jobs.scan(
+            "fake-id",
+            {
+                "metadata": {
+                    "resource_id": "fake-resource",
+                }
+            },
+        )
+    assert str(excinfo.value) == "No ckan_url provided."
+
+    with pytest.raises(util.JobError) as excinfo:
+        jobs.scan(
+            "fake-id",
+            {
+                "metadata": {
+                    "ckan_url": "http://ckan.example.com",
+                    "resource_id": "fake-resource",
+                },
+            },
+        )
+    assert str(excinfo.value) == "No CKAN API key provided"
 
 
 @responses.activate
@@ -70,8 +96,9 @@ def test_failed_resource_show():
         status=500,
     )
 
-    with pytest.raises(util.JobError):
+    with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
+    assert "500 Server Error" in str(excinfo.value)
 
 
 @responses.activate
@@ -87,8 +114,9 @@ def test_resource_is_not_upload():
         },
     )
 
-    with pytest.raises(util.JobError):
+    with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
+    assert str(excinfo.value) == "Only resources of type 'upload' can be scanned"
 
 
 @responses.activate
@@ -105,8 +133,9 @@ def test_invalid_scheme():
         },
     )
 
-    with pytest.raises(util.JobError):
+    with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
+    assert str(excinfo.value) == "Only http, https, and ftp resources may be fetched."
 
 
 @responses.activate
@@ -128,8 +157,9 @@ def test_failed_resource_download():
         status=500,
     )
 
-    with pytest.raises(util.JobError):
+    with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
+    assert "500 Server Error" in str(excinfo.value)
 
 
 @responses.activate
@@ -157,21 +187,9 @@ def test_clamav_error():
         return_value=mock.MagicMock(returncode=2, stdout=b"oh no")
     )
 
-    with pytest.raises(util.JobError):
+    with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
-
-
-"""
-TODO: at the moment we can't make assertions about the exception messages
-in the error cases because
-
-```
-with pytest.raises(util.JobError) as excinfo:
-    assert something about excinfo.value
-```
-
-throws `TypeError: __str__ returned non-string (type bytes)` in python3.
-
-Hopefully https://github.com/ckan/ckan-service-provider/pull/54 will be
-merged and we can upgrade and add assertions about the exception messages
-"""
+    assert (
+        str(excinfo.value)
+        == '{"status_code": 2, "status_text": "SCAN FAILED", "description": "oh no"}'
+    )
