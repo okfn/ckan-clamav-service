@@ -176,4 +176,5 @@ def scan(task_id, payload):
     response["status_text"] = STATUSES[scan_result.returncode]
     if scan_result.returncode == 2:
         raise util.JobError(json.dumps(response))
+    logger.info(f"Completed scanning resource {resource_id}. Submitting result")
     return response
