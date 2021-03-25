@@ -59,7 +59,7 @@ def ckan_action(action, ckan_url, api_key, payload):
         )
         r.raise_for_status()
     except RequestException as e:
-        raise util.JobError(str(e))
+        raise util.JobError(f"{str(e)} with payload {json.dumps(payload)}")
 
     return r.json()["result"]
 
