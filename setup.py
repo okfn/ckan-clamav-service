@@ -17,7 +17,7 @@ def _get_description():
 
 setup(
     name="ckan-clamav-service",
-    version="0.2.0",
+    version="0.3.0",
     author="OKFN",
     license="AGPL-3.0",
     url="https://github.com/okfn/ckan-clamav-service",
