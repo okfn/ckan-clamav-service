@@ -1,2 +1,2 @@
-ckanserviceprovider==0.0.11
-requests==2.25.1
+ckanserviceprovider==1.0.0
+requests==2.27.1
