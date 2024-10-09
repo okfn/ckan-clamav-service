@@ -156,7 +156,7 @@ def scan_resource(logger, ckan_url, api_key, resource_id):
 @job.asynchronous
 def scan(task_id, payload):
     logger = init_logger(task_id, payload)
-    logger.info(f"Starting job {task_id}")
+    logger.info(f"Starting ClamAV job {task_id}")
 
     validate_payload(payload)
 
@@ -172,9 +172,17 @@ def scan(task_id, payload):
         "description": scan_result.stdout.decode("utf-8"),
     }
     if scan_result.returncode not in STATUSES:
+        logger.error(
+            f"Unknown return code {scan_result.returncode} (not in statuses) "
+            f"scanning resource {resource_id}"
+        )
         raise util.JobError(json.dumps(response))
+
     response["status_text"] = STATUSES[scan_result.returncode]
     if scan_result.returncode == 2:
+        logger.error(f"Scan failed for resource {resource_id}: {response['description']}")
         raise util.JobError(json.dumps(response))
-    logger.info(f"Completed scanning resource {resource_id}. Submitting result")
+
+    final_status_text = response["status_text"]
+    logger.info(f"Completed scanning {final_status_text}. Resource {resource_id}. Submitting result")
     return response
