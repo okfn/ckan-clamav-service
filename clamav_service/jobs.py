@@ -180,9 +180,13 @@ def scan(task_id, payload):
 
     response["status_text"] = STATUSES[scan_result.returncode]
     if scan_result.returncode == 2:
-        logger.error(f"Scan failed for resource {resource_id}: {response['description']}")
+        logger.error(
+            f"Scan failed for resource {resource_id}: {response['description']}"
+        )
         raise util.JobError(json.dumps(response))
 
     final_status_text = response["status_text"]
-    logger.info(f"Completed scanning {final_status_text}. Resource {resource_id}. Submitting result")
+    logger.info(
+        f"Completed scanning {final_status_text}. Resource {resource_id}. Submitting result"
+    )
     return response
