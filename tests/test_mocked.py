@@ -121,10 +121,8 @@ def test_resource_is_not_upload():
 
     with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
-    assert (
-        str(excinfo.value)
-        == "Only resources of type 'upload' can be scanned. Received 'datastore'"
-    )
+    expected_error = "Only resources of type 'upload' can be scanned. Received 'datastore'"
+    assert expected_error in str(excinfo.value)
 
 
 @responses.activate
@@ -143,7 +141,8 @@ def test_invalid_scheme():
 
     with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
-    assert str(excinfo.value) == "Only http, https, and ftp resources may be fetched."
+    expected_error = "Only http, https, and ftp resources may be fetched."
+    assert expected_error in str(excinfo.value)
 
 
 @responses.activate

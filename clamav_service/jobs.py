@@ -215,6 +215,8 @@ def scan(task_id, payload):
 
     try:
         response = scan_resource(logger, ckan_url, api_key, resource_id)
+        if response.get("error"):
+            raise util.JobError(json.dumps(response))
     except Exception as e:
         response = {
             "status_code": 2,
