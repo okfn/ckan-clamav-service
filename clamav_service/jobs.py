@@ -130,7 +130,7 @@ def scan_file(filename):
         result.file_size = file_size
         result.elapsed_time = elapsed_time
         return result
-    except subprocess.TimeoutExpired as e:
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
         elapsed_time = time.time() - start_time
         # Enhance the error with file size and elapsed time info
         e.file_size = file_size
@@ -187,16 +187,17 @@ def scan_resource(logger, ckan_url, api_key, resource_id):
                 f"Scan completed in {scan_result.elapsed_time:.2f} seconds "
                 f"for file of size {scan_result.file_size / 1024:.2f} KB"
             )
-        except subprocess.TimeoutExpired as e:
-            response["error"] = f"Scan timed out: {e}"
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+            if isinstance(e, subprocess.TimeoutExpired):
+                response["error"] = f"Scan timed out: {e}"
+            else:
+                response["error"] = f"Scan failed: {e}"
             response["file_size"] = file_size
             response["elapsed_time"] = e.elapsed_time
             logger.error(
                 f"Scan timed out after {e.elapsed_time:.2f} seconds "
                 f"for file of size {e.file_size / 1024:.2f} KB"
             )
-        except subprocess.SubprocessError as e:
-            response["error"] = f"Scan failed: {e}"
 
     return response
 
