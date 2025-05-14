@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import subprocess
 import tempfile
 import time
@@ -114,9 +115,27 @@ def fetch_resource(url, tmpfile, api_key):
 
 
 def scan_file(filename):
-    return subprocess.run(
-        ["clamscan", filename], stdout=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
-    )
+    # Get file size before scanning
+    file_size = os.path.getsize(filename)
+
+    # Record start time
+    start_time = time.time()
+
+    try:
+        result = subprocess.run(
+            ["clamscan", filename], stdout=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
+        )
+        elapsed_time = time.time() - start_time
+        # Add size and time info to result object for later logging
+        result.file_size = file_size
+        result.elapsed_time = elapsed_time
+        return result
+    except subprocess.TimeoutExpired as e:
+        elapsed_time = time.time() - start_time
+        # Enhance the error with file size and elapsed time info
+        e.file_size = file_size
+        e.elapsed_time = elapsed_time
+        raise e
 
 
 def scan_resource(logger, ckan_url, api_key, resource_id):
@@ -144,10 +163,27 @@ def scan_resource(logger, ckan_url, api_key, resource_id):
             fetch_resource(url, tmp, api_key)
         except RequestException as e:
             raise util.JobError(str(e))
-        logger.info(f"Scanning {tmp.name}")
+
+        # Add file size info to log message
+        file_size = os.path.getsize(tmp.name)
+        logger.info(f"Scanning {tmp.name} (size: {file_size / 1024:.2f} KB)")
+
         try:
             scan_result = scan_file(tmp.name)
-        except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
+            logger.info(
+                f"Scan completed in {scan_result.elapsed_time:.2f} seconds "
+                f"for file of size {scan_result.file_size / 1024:.2f} KB"
+            )
+        except subprocess.TimeoutExpired as e:
+            logger.error(
+                f"Scan timed out after {e.elapsed_time:.2f} seconds "
+                f"for file of size {e.file_size / 1024:.2f} KB"
+            )
+            raise util.JobError(
+                f"Scan timed out after {e.elapsed_time:.2f} seconds "
+                f"for file size {e.file_size / 1024:.2f} KB: {str(e)}"
+            )
+        except subprocess.SubprocessError as e:
             raise util.JobError(str(e))
 
     return scan_result
@@ -165,16 +201,34 @@ def scan(task_id, payload):
     resource_id = data["resource_id"]
     api_key = payload.get("api_key")
 
-    scan_result = scan_resource(logger, ckan_url, api_key, resource_id)
+    try:
+        scan_result = scan_resource(logger, ckan_url, api_key, resource_id)
+    except util.JobError as e:
+        response = {
+            "status_code": 2,
+            "description": f"JobError {e}",
+        }
+    except Exception as e:
+        response = {
+            "status_code": 2,
+            "description": f"Unexpected error: {e}",
+        }
+        raise util.JobError(json.dumps(response))
+    else:
+        response = {
+            "status_code": scan_result.returncode,
+            "description": scan_result.stdout.decode("utf-8"),
+        }
 
-    response = {
-        "status_code": scan_result.returncode,
-        "description": scan_result.stdout.decode("utf-8"),
-    }
     if scan_result.returncode not in STATUSES:
+        file_size = getattr(scan_result, "file_size", 0)
+        elapsed_time = getattr(scan_result, "elapsed_time", 0)
         logger.error(
             f"Unknown return code {scan_result.returncode} (not in statuses) "
-            f"scanning resource {resource_id}"
+            f"scanning resource {resource_id} "
+            f"File size: {file_size / 1024:.2f} KB, "
+            f"Scan time: {elapsed_time:.2f} seconds, "
+            f"Stdout: {response['description']}"
         )
         raise util.JobError(json.dumps(response))
 
