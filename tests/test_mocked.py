@@ -36,7 +36,12 @@ def test_completed_scan():
     )
 
     jobs.scan_file = mock.Mock(
-        return_value=mock.MagicMock(returncode=0, stdout=b"/tmp/tmp37q_kv9u: OK...")
+        return_value=mock.MagicMock(
+            returncode=0,
+            stdout=b"/tmp/tmp37q_kv9u: OK...",
+            file_size=1234,
+            elapsed_time=0.123,
+        )
     )
 
     response = jobs.scan("fake-id", test_payload)
@@ -116,10 +121,8 @@ def test_resource_is_not_upload():
 
     with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
-    assert (
-        str(excinfo.value)
-        == "Only resources of type 'upload' can be scanned. Received 'datastore'"
-    )
+    expected_error = "Only resources of type 'upload' can be scanned. Received 'datastore'"
+    assert expected_error in str(excinfo.value)
 
 
 @responses.activate
@@ -138,7 +141,8 @@ def test_invalid_scheme():
 
     with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
-    assert str(excinfo.value) == "Only http, https, and ftp resources may be fetched."
+    expected_error = "Only http, https, and ftp resources may be fetched."
+    assert expected_error in str(excinfo.value)
 
 
 @responses.activate
@@ -187,7 +191,12 @@ def test_clamav_error():
 
     jobs.update_clamav_definitions = mock.Mock()
     jobs.scan_file = mock.Mock(
-        return_value=mock.MagicMock(returncode=2, stdout=b"oh no")
+        return_value=mock.MagicMock(
+            returncode=2,
+            stdout=b"oh no",
+            file_size=1234,
+            elapsed_time=0.123,
+        )
     )
 
     with pytest.raises(util.JobError) as excinfo:

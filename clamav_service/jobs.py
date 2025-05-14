@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import subprocess
 import tempfile
 import time
@@ -114,43 +115,91 @@ def fetch_resource(url, tmpfile, api_key):
 
 
 def scan_file(filename):
-    return subprocess.run(
-        ["clamscan", filename], stdout=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
-    )
+    # Get file size before scanning
+    file_size = os.path.getsize(filename)
+
+    # Record start time
+    start_time = time.time()
+
+    try:
+        result = subprocess.run(
+            ["clamscan", filename], stdout=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
+        )
+        elapsed_time = time.time() - start_time
+        # Add size and time info to result object for later logging
+        result.file_size = file_size
+        result.elapsed_time = elapsed_time
+        return result
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+        elapsed_time = time.time() - start_time
+        # Enhance the error with file size and elapsed time info
+        e.file_size = file_size
+        e.elapsed_time = elapsed_time
+        raise e
 
 
 def scan_resource(logger, ckan_url, api_key, resource_id):
+    response = {
+        'error': None,
+        'file_size': -1,
+        'elapsed_time': -1,
+        'returncode': 2,  # Default to 2 (scan failed)
+        'stdout': '',
+    }
+    # try again in 5 seconds just incase CKAN is slow at adding resource
+    time.sleep(5)
     try:
         resource = ckan_action("resource_show", ckan_url, api_key, {"id": resource_id})
-    except util.JobError:
-        # try again in 5 seconds just incase CKAN is slow at adding resource
-        time.sleep(5)
-        resource = ckan_action("resource_show", ckan_url, api_key, {"id": resource_id})
+    except util.JobError as e:
+        response["error"] = f'Error showing resource: {e}'
+        return response
 
     url_type = resource.get("url_type")
     if url_type != "upload":
-        raise util.JobError(
-            f"Only resources of type 'upload' can be scanned. Received '{str(url_type)}'"
-        )
+        response["error"] = f"Only resources of type 'upload' can be scanned. Received '{str(url_type)}'"
+        return response
 
     url = resource.get("url")
     scheme = urlsplit(url).scheme
     if scheme not in ("http", "https", "ftp"):
-        raise util.JobError("Only http, https, and ftp resources may be fetched.")
+        response["error"] = "Only http, https, and ftp resources may be fetched."
+        return response
 
     logger.info(f"Fetching from {url}")
     with tempfile.NamedTemporaryFile() as tmp:
         try:
             fetch_resource(url, tmp, api_key)
         except RequestException as e:
-            raise util.JobError(str(e))
-        logger.info(f"Scanning {tmp.name}")
+            response["error"] = f"Error fetching resource: {e}"
+            return response
+
+        # Add file size info to log message
+        file_size = os.path.getsize(tmp.name)
+        response["file_size"] = file_size
+        logger.info(f"Scanning {tmp.name} (size: {file_size / 1024:.2f} KB)")
+
         try:
             scan_result = scan_file(tmp.name)
-        except (subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
-            raise util.JobError(str(e))
+            response["returncode"] = scan_result.returncode
+            response["stdout"] = scan_result.stdout.decode("utf-8")
+            response["elapsed_time"] = scan_result.elapsed_time
+            logger.info(
+                f"Scan completed in {scan_result.elapsed_time:.2f} seconds "
+                f"for file of size {scan_result.file_size / 1024:.2f} KB"
+            )
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+            if isinstance(e, subprocess.TimeoutExpired):
+                response["error"] = f"Scan timed out: {e}"
+            else:
+                response["error"] = f"Scan failed: {e}"
+            response["file_size"] = file_size
+            response["elapsed_time"] = e.elapsed_time
+            logger.error(
+                f"Scan timed out after {e.elapsed_time:.2f} seconds "
+                f"for file of size {e.file_size / 1024:.2f} KB"
+            )
 
-    return scan_result
+    return response
 
 
 @job.asynchronous
@@ -165,21 +214,37 @@ def scan(task_id, payload):
     resource_id = data["resource_id"]
     api_key = payload.get("api_key")
 
-    scan_result = scan_resource(logger, ckan_url, api_key, resource_id)
+    try:
+        response = scan_resource(logger, ckan_url, api_key, resource_id)
+        if response.get("error"):
+            raise util.JobError(json.dumps(response))
+    except Exception as e:
+        response = {
+            "status_code": 2,
+            "description": f"Unexpected error: {e}",
+        }
+        raise util.JobError(json.dumps(response))
+    else:
+        response = {
+            "status_code": response['returncode'],
+            "description": response["stdout"],
+        }
 
-    response = {
-        "status_code": scan_result.returncode,
-        "description": scan_result.stdout.decode("utf-8"),
-    }
-    if scan_result.returncode not in STATUSES:
+    returncode = response["status_code"]
+    if returncode not in STATUSES:
+        file_size = response.get("file_size", 0)
+        elapsed_time = response.get("elapsed_time", 0)
         logger.error(
-            f"Unknown return code {scan_result.returncode} (not in statuses) "
-            f"scanning resource {resource_id}"
+            f"Unknown return code {returncode} (not in statuses) "
+            f"scanning resource {resource_id} "
+            f"File size: {file_size / 1024:.2f} KB, "
+            f"Scan time: {elapsed_time:.2f} seconds, "
+            f"Stdout: {response['description']}"
         )
         raise util.JobError(json.dumps(response))
 
-    response["status_text"] = STATUSES[scan_result.returncode]
-    if scan_result.returncode == 2:
+    response["status_text"] = STATUSES[returncode]
+    if returncode == 2:
         logger.error(
             f"Scan failed for resource {resource_id}: {response['description']}"
         )
