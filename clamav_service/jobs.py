@@ -185,7 +185,7 @@ def scan_resource(logger, ckan_url, api_key, resource_id):
             response["elapsed_time"] = scan_result.elapsed_time
             logger.info(
                 f"Scan completed in {scan_result.elapsed_time:.2f} seconds "
-                f"for file of size {scan_result.file_size / 1024:.2f} KB"
+                f"for file of size {file_size / 1024:.2f} KB"
             )
         except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
             if isinstance(e, subprocess.TimeoutExpired):
