@@ -225,10 +225,8 @@ def scan(task_id, payload):
         }
         raise util.JobError(json.dumps(response))
     else:
-        response = {
-            "status_code": response['returncode'],
-            "description": response["stdout"],
-        }
+        response["status_code"] = response['returncode']
+        response["description"] = response["stdout"]
 
     returncode = response["status_code"]
     if returncode not in STATUSES:
