@@ -1,3 +1,4 @@
+import json
 from unittest import mock
 
 import pytest
@@ -39,7 +40,6 @@ def test_completed_scan():
         return_value=mock.MagicMock(
             returncode=0,
             stdout=b"/tmp/tmp37q_kv9u: OK...",
-            file_size=1234,
             elapsed_time=0.123,
         )
     )
@@ -48,11 +48,12 @@ def test_completed_scan():
 
     jobs.scan_file.assert_called_once()
 
-    assert {
-        "status_code": 0,
-        "status_text": "SUCCESSFUL SCAN, FILE CLEAN",
-        "description": "/tmp/tmp37q_kv9u: OK...",
-    } == response
+    assert response['status_code'] == 0
+    assert response['stdout'] == "/tmp/tmp37q_kv9u: OK..."
+    assert response["status_text"] == "SUCCESSFUL SCAN, FILE CLEAN"
+    assert response["description"] == "/tmp/tmp37q_kv9u: OK..."
+    assert response['elapsed_time'] == 0.123
+    assert response['file_size'] == 5  # this is the size of "a,b,c"
 
 
 @responses.activate
@@ -201,7 +202,11 @@ def test_clamav_error():
 
     with pytest.raises(util.JobError) as excinfo:
         jobs.scan("fake-id", test_payload)
-    assert (
-        str(excinfo.value)
-        == '{"status_code": 2, "description": "oh no", "status_text": "SCAN FAILED"}'
-    )
+
+    val_dict = json.loads(str(excinfo.value))
+    assert val_dict['status_code'] == 2
+    assert val_dict['description'] == "oh no"
+    assert val_dict['status_text'] == "SCAN FAILED"
+    assert val_dict['elapsed_time'] == 0.123
+    assert val_dict['returncode'] == 2
+    assert val_dict['file_size'] == 5  # this is the size of "a,b,c"
